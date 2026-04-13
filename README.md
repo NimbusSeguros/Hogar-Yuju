@@ -104,4 +104,4 @@ npm run dev
 ```
 
 ---
-Diseñado con ❤️ por el equipo de **Yuju** & **Antigravity**.
+Diseñado con ❤️ por el equipo de **Yuju**.
