@@ -10,7 +10,7 @@ export const getObjects = async (req: Request, res: Response) => {
         const objects = await provider.getGlobalObjects();
         res.json(objects);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
@@ -23,7 +23,7 @@ export const getIndicios = async (req: Request, res: Response) => {
         const indicios = await provider.getIndicios(objectCode);
         res.json(indicios);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
@@ -36,7 +36,7 @@ export const getForm = async (req: Request, res: Response) => {
         const form = await provider.getForm(objectCode, indicioCode);
         res.json(form);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
@@ -70,6 +70,7 @@ export const getPlansByConsultaId = async (req: Request, res: Response) => {
 // ===== EMISSION FLOW =====
 
 export const createOrder = async (req: Request, res: Response) => {
+    console.log('[Controller] createOrder reached with body:', JSON.stringify(req.body, null, 2));
     try {
         const { provider: providerName = 'RUS' } = req.query;
         const { idConsulta, plan, formaPago, personalData } = req.body;
@@ -94,7 +95,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
         res.json({ rusOrder, dbOrder });
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
@@ -121,41 +122,151 @@ export const submitClientData = async (req: Request, res: Response) => {
 
         res.json(result);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
 export const submitEmissionForm = async (req: Request, res: Response) => {
+    console.log('[Controller] submitEmissionForm reached with body:', JSON.stringify(req.body, null, 2));
     try {
         const { ordenVentaId } = req.params;
-        const { answers, addressData } = req.body;
+        const { answers, addressData, personalData } = req.body;
         const { provider: providerName = 'RUS' } = req.query;
         const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
         await provider.authenticate();
 
-        const result = await provider.submitEmissionForm(ordenVentaId, answers);
+        if (personalData && addressData) {
+            // Transform frontend personalData into RUS exact schema, combining with the collected address
+            const clientPayload = {
+                nombre: personalData.nombre,
+                apellido: personalData.apellido,
+                tipoDocumento: personalData.tipoDocumento || 'DNI',
+                numeroDocumento: personalData.numeroDocumento,
+                nacionalidad: personalData.nacionalidad || 'ARG',
+                fechaNacimiento: `${personalData.fechaNacimientoAno}-${personalData.fechaNacimientoMes.padStart(2, '0')}-${personalData.fechaNacimientoDia.padStart(2, '0')}`,
+                email: personalData.email,
+                // SIAPI Kontakt/Contacto expects flat fields for phone, NOT a telefonos array
+                codTelefonoPais: "54", 
+                codTelefonoArea: personalData.telefono_codigo_area,
+                numeroTelefono: personalData.telefono_numero,
+                tipoPersona: "FISICA",
+                condicionIVA: "CONSUMIDOR_FINAL",
+                condicionIIBB: "NO_INSCRIPTO",
+                domicilio: {
+                    calle: addressData.calle,
+                    numero: addressData.numero,
+                    localidad: addressData.localidad,
+                    codigoPostal: addressData.codigoPostal,
+                    pais: 'ARGENTINA',
+                    provincia: addressData.provincia || 'ENTRE_RIOS' 
+                }
+            };
 
-        // Guardar domicilio en Supabase
+            console.log('[Controller] Submitting Client Data:', JSON.stringify(clientPayload, null, 2));
+            await provider.submitClientData(ordenVentaId, clientPayload);
+        }
+
+        // Add mandatory underwiting answers for RUS CF Freestyle
+        // 3. Submit the emission form answers (The actual underwriting questions)
+        const finalAnswers = [...answers];
+
+        // Ensure address questions use the specific CF codes
+        const addressMap: any = {
+            'CALLE_CF': addressData?.calle || 'SN',
+            'ALT_CF': addressData?.numero || '0',
+            'CPPPP': addressData?.codigoPostal || '0000',
+        };
+
+        for (const [codigo, valor] of Object.entries(addressMap)) {
+            if (!finalAnswers.find((a: any) => a.codigoPregunta === codigo)) {
+                finalAnswers.push({ codigoPregunta: codigo, valores: [valor] });
+            }
+        }
+
+        // Add hidden mandatory answers with discovered internal IDs from emission_form_discovery.json
+        const defaultQs: any = {
+            'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD1',
+            'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS': 'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2',
+            'M222': 100, // Number, not string
+            'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS': 'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS2',
+            'VIVIENDA_COMBINADOFAMILIAR_OCUPACION': 'VIVIENDA_COMBINADOFAMILIAR_OCUPACION1',
+            'med_seg_pack': 'ALARMA', 
+            'VIVIENDA_COMBINADOFAMILIAR_MURO': 'VIVIENDA_COMBINADOFAMILIAR_MURO2',
+            'tipoo': 'casss', // Discovered mandatory code for "Su vivienda es"
+            'matconst': 'trad', // Discovered ID for Ladrillo
+            'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK': 'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK1'
+        };
+
+        for (const [codigo, valor] of Object.entries(defaultQs)) {
+            if (!finalAnswers.find((a: any) => a.codigoPregunta === codigo)) {
+                finalAnswers.push({ codigoPregunta: codigo, valores: [valor] });
+            }
+        }
+
+        console.log('[Controller] Submitting Emission Form Answers:', JSON.stringify({ respuestas: finalAnswers }, null, 2));
+        const result = await provider.submitEmissionForm(ordenVentaId, finalAnswers);
+
+        // Guardar en Supabase - Guardamos telefono, nacimiento y limpiamos el json de domicilio
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
         if (existing) {
-            await SupabaseProvider.saveHogarOrder({
+            // Extraer solo lo más importante del domicilio
+            const cleanDomicilio = {
+                calle: addressData?.calle || '',
+                numero: addressData?.numero || '',
+                piso: addressData?.piso || '',
+                dpto: addressData?.dpto || '',
+                localidad: addressData?.localidad || '',
+                codigoPostal: addressData?.codigoPostal || ''
+            };
+
+            const updatePayload: any = {
                 id: existing.id,
-                domicilio: addressData,
+                domicilio: cleanDomicilio,
                 estado: 'domicilio_completado'
-            });
+            };
+
+            // Asegurar que guardamos telefono y fecha de nacimiento si vienen en personalData
+            if (personalData) {
+                updatePayload.telefono = `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`;
+                updatePayload.fecha_nacimiento = `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`;
+            }
+
+            await SupabaseProvider.saveHogarOrder(updatePayload);
         }
 
         res.json(result);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        console.error('[Controller] ERROR in submitEmissionForm:', JSON.stringify(error?.response?.data || error.message, null, 2));
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
+};
+
+const deobfuscate = (encoded: string): string => {
+    const key = 'YUJU_SECURE_KEY_2024';
+    const text = Buffer.from(encoded, 'base64').toString();
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+        result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+    return result;
 };
 
 export const submitPaymentInfo = async (req: Request, res: Response) => {
     try {
         const { ordenVentaId } = req.params;
-        const { paymentInfo } = req.body;
+        let { paymentInfo, _enc } = req.body;
         const { provider: providerName = 'RUS' } = req.query;
+
+        // Deobfuscate if requested by frontend
+        if (_enc) {
+            if (paymentInfo.numeroTarjeta) {
+                paymentInfo.numeroTarjeta = deobfuscate(paymentInfo.numeroTarjeta);
+            }
+            if (paymentInfo.CBU) {
+                paymentInfo.CBU = deobfuscate(paymentInfo.CBU);
+            }
+        }
+
         const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
         await provider.authenticate();
 
@@ -172,7 +283,7 @@ export const submitPaymentInfo = async (req: Request, res: Response) => {
 
         res.json(result);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 
@@ -196,7 +307,7 @@ export const confirmOrder = async (req: Request, res: Response) => {
 
         res.json(result);
     } catch (error: any) {
-        res.status(500).json({ error: error.message, details: error?.response?.data });
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
 

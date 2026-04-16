@@ -17,8 +17,11 @@ export class RusProvider implements InsuranceProvider {
 
         // Interceptor to add access token to requests
         this.apiClient.interceptors.request.use((config) => {
-            if (this.accessToken) {
-                config.headers['Authorization'] = `Bearer ${this.accessToken}`;
+            if (this.accessToken && config.headers) {
+                config.headers.set('Authorization', `Bearer ${this.accessToken}`);
+                console.log(`[RusProvider] Injecting token: ${this.accessToken.substring(0, 10)}...`);
+            } else {
+                console.warn('[RusProvider] No accessToken available for request:', config.url);
             }
             return config;
         }, (error) => {
@@ -106,15 +109,25 @@ export class RusProvider implements InsuranceProvider {
             codigoPlan: plan.codigo,
             cantidadCuotas: formaPago.cantidadCuotas,
             precioCuota: formaPago.precioCuota,
-            codigoISOMoneda: formaPago.codigoISOMoneda,
+            codigoISOMoneda: formaPago.codigoISOMoneda || 'ARS',
             medioPago: formaPago.mediosPago[0], // Use first available for start
             inicioVigencia: new Date().toISOString().split('T')[0], // Today
-            finVigencia: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0], // 1 year later
+            finVigencia: (() => {
+                const d = new Date();
+                d.setMonth(d.getMonth() + 6);
+                return d.toISOString().split('T')[0];
+            })(), // Exactly 6 months later
             cantidadObjetos: 1, // Fixed for Hogar for now
             codigoProductor: process.env.RUS_DEFAULT_PRODUCER_CODE || "" 
         };
-        const response = await this.apiClient.post('/ordenventa', body);
-        return response.data;
+        console.log('[RusProvider] Creating order with payload:', JSON.stringify(body, null, 2));
+        try {
+            const response = await this.apiClient.post('/ordenventa', body);
+            return response.data;
+        } catch (error: any) {
+            console.error('[RusProvider] ERROR creating order:', error?.response?.data || error.message);
+            throw error;
+        }
     }
 
     /** STEP 2: Cargar datos personales del tomador */
@@ -128,8 +141,14 @@ export class RusProvider implements InsuranceProvider {
     async submitEmissionForm(ordenVentaId: string, answers: any[]): Promise<any> {
         // En emisión, se espera RespuestasEmisionRequest
         const body = { respuestas: answers };
-        const response = await this.apiClient.post(`/ordenventas/${ordenVentaId}/formularios/respuesta`, body);
-        return response.data;
+        console.log('[RusProvider] Submitting emission form with payload:', JSON.stringify(body, null, 2));
+        try {
+            const response = await this.apiClient.post(`/ordenventas/${ordenVentaId}/formularios/respuesta`, body);
+            return response.data;
+        } catch (error: any) {
+            console.error('[RusProvider] ERROR submitting emission form:', error?.response?.data || error.message);
+            throw error;
+        }
     }
 
     /** STEP 4: Cargar datos de pago */
