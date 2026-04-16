@@ -8,8 +8,6 @@ import { StepPayment } from './components/StepPayment';
 import { CheckCircle } from 'lucide-react';
 
 const steps = [
-  'Datos personales', // Wait, the UI starts with PACKs, but the stepper has: Datos personales, Datos del domicilio, Métodos de pago, Datos del producto. 
-  // Let's use the actual stepper layout from the images: 
   'Datos personales',
   'Datos del domicilio',
   'Métodos de pago',
@@ -67,18 +65,22 @@ function App() {
           {currentStep === 1 && (
             <StepPersonal 
               selection={selection} 
+              initialData={personalData}
               onNext={handleOrderCreated} 
             />
           )}
           {currentStep === 2 && (
             <StepAddress 
               orderVentaId={orderVentaId} 
+              personalData={personalData}
+              initialData={addressData}
               onNext={handleAddressSubmitted} 
             />
           )}
           {currentStep === 3 && (
             <StepPayment 
               orderVentaId={orderVentaId} 
+              initialData={null} // Can be extended if needed
               onNext={handlePaymentSubmitted} 
             />
           )}

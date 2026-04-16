@@ -7,6 +7,15 @@ interface Props {
   onNext: () => void;
 }
 
+const obfuscate = (text: string): string => {
+  const key = 'YUJU_SECURE_KEY_2024';
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(result);
+};
+
 export const StepPayment: React.FC<Props> = ({ orderVentaId, onNext }) => {
   const [selectedMethod, setSelectedMethod] = useState<'TARJETA_CREDITO' | 'DEBITO_AUTOMATICO'>('TARJETA_CREDITO');
   const [formData, setFormData] = useState({
@@ -40,20 +49,23 @@ export const StepPayment: React.FC<Props> = ({ orderVentaId, onNext }) => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Submit Payment Info
+      // 1. Submit Payment Info (Obfuscated for Network Tab Security)
       const paymentInfo: any = {
         medioPago: selectedMethod
       };
 
       if (selectedMethod === 'TARJETA_CREDITO') {
-        paymentInfo.numeroTarjeta = formData.numeroTarjeta.replace(/\s/g, '');
+        const rawNum = formData.numeroTarjeta.replace(/\s/g, '');
+        paymentInfo.numeroTarjeta = obfuscate(rawNum);
         paymentInfo.marcaTarjeta = formData.marcaTarjeta;
       } else {
-        paymentInfo.CBU = formData.cbu.replace(/\s/g, '');
+        const rawCbu = formData.cbu.replace(/\s/g, '');
+        paymentInfo.CBU = obfuscate(rawCbu);
       }
 
       await axios.post(`http://localhost:3000/api/insurance/home/orders/${orderVentaId}/infopago`, {
-        paymentInfo
+        paymentInfo,
+        _enc: true // Flag to tell backend to decrypt
       });
 
       // 2. Confirm Order (Final Emission)
