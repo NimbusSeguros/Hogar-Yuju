@@ -258,13 +258,14 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
         const defaultQs: any = {
             'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD2',
             'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS': 'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2',
-            'M222': 100,
+            'M222': '100',
             'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS': 'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS2',
             'VIVIENDA_COMBINADOFAMILIAR_OCUPACION': 'VIVIENDA_COMBINADOFAMILIAR_OCUPACION1',
             'med_seg_pack': 'ALARMA', 
             'VIVIENDA_COMBINADOFAMILIAR_MURO': 'VIVIENDA_COMBINADOFAMILIAR_MURO2',
             'tipooo': 'jous',
             'matconst': 'trad',
+            'LOTE': '0',
             'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK': 'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK1'
         };
 
@@ -275,11 +276,17 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
         }
 
         // 4. Filter and Submit
-        const filteredAnswers = finalAnswers.filter(ans => validCodes.has(ans.codigoPregunta));
+        // IMPORTANT: RUS API requires all values to be STRINGS, even for NUMBER types.
+        const filteredAnswers = finalAnswers
+            .filter(ans => validCodes.has(ans.codigoPregunta))
+            .map(ans => ({
+                ...ans,
+                valores: ans.valores.map((v: any) => String(v))
+            }));
         
         let result = { message: 'No underwriting questions required' };
         if (filteredAnswers.length > 0) {
-            console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify(filteredAnswers, null, 2));
+            console.log('[Controller] Submitting Filtered Emission Form Answers (as strings):', JSON.stringify(filteredAnswers, null, 2));
             result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
         } else if (validCodes.size > 0) {
             console.error('[Controller] CRITICAL: Form has questions but none matched our defaults!', Array.from(validCodes));
