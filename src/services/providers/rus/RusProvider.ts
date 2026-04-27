@@ -164,6 +164,14 @@ export class RusProvider implements InsuranceProvider {
         return response.data;
     }
 
+    /** STEP 6: Descargar el PDF de la póliza */
+    async getPolizaPdf(ramo: number, poliza: number, endoso: number): Promise<any> {
+        const response = await this.apiClient.get(`/polizas/${ramo}/${poliza}/${endoso}/pdf`, {
+            responseType: 'arraybuffer'
+        });
+        return response.data;
+    }
+
     // ===== LEGACY CAMPAIGN ENDPOINTS =====
     async getObject(campaignCode: string, objectCode: string): Promise<any> {
         const response = await this.apiClient.get(`/campanias/${campaignCode}/objetos/${objectCode}`);

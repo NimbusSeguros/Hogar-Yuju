@@ -1,0 +1,442 @@
+{
+  "formularioDTO": {
+    "id": 244,
+    "inicio": {
+      "codigosPreguntas": [
+        "VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD",
+        "VIVIENDA_COMBINADOFAMILIAR_SINIESTROS",
+        "matconst",
+        "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK",
+        "CALLE_CF",
+        "ALT_CF",
+        "CPPPP",
+        "M222",
+        "VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS",
+        "VIVIENDA_COMBINADOFAMILIAR_CARACTER",
+        "VIVIENDA_COMBINADOFAMILIAR_OCUPACION",
+        "med_seg_pack",
+        "VIVIENDA_COMBINADOFAMILIAR_MURO"
+      ],
+      "alertas": []
+    },
+    "preguntas": [
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD",
+        "texto": "¿Desarrolla actividad comercial o profesional en la vivienda?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD1",
+            "texto": "SI",
+            "esRestrictiva": true,
+            "codigosPreguntasSiguientes": [],
+            "alertas": [
+              {
+                "codigo": "VIVIENDA_COMBINADOFAMILIAR_OCUPACION_ALERTA",
+                "texto": "La vivienda debe ser de uso familiar exclusivamente"
+              }
+            ]
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD2",
+            "texto": "NO",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 1,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "ActividadComercialVivienda"
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_SINIESTROS",
+        "texto": "¿Ha tenido siniestros en la vivienda en el último año?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_SINIESTROS1",
+            "texto": "SI",
+            "esRestrictiva": true,
+            "codigosPreguntasSiguientes": [],
+            "alertas": [
+              {
+                "codigo": "Siniestrosss",
+                "texto": "Para poder avanzar con la contratación del seguro deberás contactarte con tu Productor asesor de seguros o al 0800-888-7787."
+              }
+            ]
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2",
+            "texto": "NO",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 2,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "SINIESTROS_ULT_ANIO"
+      },
+      {
+        "codigo": "matconst",
+        "texto": "¿Cuál es el tipo de construcción de tu vivienda?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "mad",
+            "texto": "Construcción en madera (Viviendas tipo cabaña o similares).",
+            "esRestrictiva": true,
+            "codigosPreguntasSiguientes": [],
+            "alertas": [
+              {
+                "codigo": "Siniestrosss",
+                "texto": "Para poder avanzar con la contratación del seguro deberás contactarte con tu Productor asesor de seguros o al 0800-888-7787."
+              }
+            ]
+          },
+          {
+            "codigo": "trad",
+            "texto": "Construcción tradicional (hormigón, ladrillo o materiales resistentes al fuego).",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 3
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK",
+        "texto": "¿Qué tipo de vivienda desea asegurar?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK3",
+            "texto": "Barrio Privado",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [
+              "LOTE"
+            ],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK4",
+            "texto": "Casa de fin de semana (no en Barrio Privado)",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK1",
+            "texto": " Casa o Depto en planta baja, 1er o 2do piso",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [
+              "tipooo"
+            ],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK2",
+            "texto": "Depto en 3er piso o superior",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [
+              "PISO_CF",
+              "DPTO_CF"
+            ],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 5,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "TIPO_VIVIENDA"
+      },
+      {
+        "codigo": "tipooo",
+        "texto": "Su vivienda es",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "jous",
+            "texto": "Casa",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "apartament",
+            "texto": "Departamento",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [
+              "PISO_CF",
+              "DPTO_CF"
+            ],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 6
+      },
+      {
+        "codigo": "CALLE_CF",
+        "texto": "Calle",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "STRING",
+        "opciones": [],
+        "numeroOrden": 10,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_JSON",
+        "codigoAtributoSis": "DOMICILIO_calle"
+      },
+      {
+        "codigo": "ALT_CF",
+        "texto": "Altura",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "NUMBER",
+        "opciones": [],
+        "numeroOrden": 12,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_JSON",
+        "codigoAtributoSis": "DOMICILIO_numeroFinca"
+      },
+      {
+        "codigo": "LOTE",
+        "texto": "Numero de lote o UF",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "NUMBER",
+        "opciones": [],
+        "numeroOrden": 13
+      },
+      {
+        "codigo": "PISO_CF",
+        "texto": "Piso",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "STRING",
+        "opciones": [],
+        "numeroOrden": 15,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_JSON",
+        "codigoAtributoSis": "DOMICILIO_pisoCalleInterna"
+      },
+      {
+        "codigo": "DPTO_CF",
+        "texto": "Departamento",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "STRING",
+        "opciones": [],
+        "numeroOrden": 16,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_JSON",
+        "codigoAtributoSis": "DOMICILIO_dpto"
+      },
+      {
+        "codigo": "CPPPP",
+        "texto": "Código postal de la vivienda.",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "NUMBER",
+        "opciones": [],
+        "numeroOrden": 17,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_JSON",
+        "codigoAtributoSis": "DOMICILIO_localidad_id"
+      },
+      {
+        "codigo": "M222",
+        "texto": "Superficie cubierta (m2)",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "NUMBER",
+        "opciones": [],
+        "numeroOrden": 21,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "SUPERFICIE"
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS",
+        "texto": "¿Posee dependencias?",
+        "significado": "Construcciones separadas de la vivienda principal. Ejemplos: galpón, depósito, quincho.",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS1",
+            "texto": "SI",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS2",
+            "texto": "NO",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 22,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "DEPENDENCIAS"
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_CARACTER",
+        "texto": "¿Es propietario o inquilino de la vivienda?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_CARACTER2",
+            "texto": "Inquilino",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_CARACTER1",
+            "texto": "Propietario",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 30
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_OCUPACION",
+        "texto": "Tipo de ocupación.",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_OCUPACION1",
+            "texto": "Permanente",
+            "significado": "Es la casahabitación, la que utiliza el asegurado para vivir en ella.",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_OCUPACION2",
+            "texto": "Semipermanente",
+            "significado": "Vivienda deshabitada por un período menor a 45 días consecutivos, o 120 alternados durante el año de vigencia de la póliza.",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 40,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "TIPO_OCUPACION_VIVIENDA"
+      },
+      {
+        "codigo": "med_seg_pack",
+        "texto": "¿Cuál o cuales de las siguientes medidas de seguridad posee?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "MULTIPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "CERRADURA_DOBLE_PALETA",
+            "texto": "1- Cerradura doble paleta o candados en todas las puertas exteriores",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "PERSIANAS",
+            "texto": "2- Persianas y/o Postigones y/o Blindex\n",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "REJA",
+            "texto": "3- Rejas en aberturas exteriores",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "ALARMA",
+            "texto": "4- Sistema de alarmas",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          },
+          {
+            "codigo": "ninguna",
+            "texto": "5- Ninguna de las anteriores",
+            "esRestrictiva": true,
+            "codigosPreguntasSiguientes": [],
+            "alertas": [
+              {
+                "codigo": "ninguan",
+                "texto": "Debe contar con al menos una de las medidas de seguridad."
+              }
+            ]
+          }
+        ],
+        "numeroOrden": 50,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL_MULTIPLE",
+        "codigoAtributoSis": "med_seg_pack"
+      },
+      {
+        "codigo": "VIVIENDA_COMBINADOFAMILIAR_MURO",
+        "texto": "¿Limita con terreno baldío, obra en construcción o edificio abandonado?",
+        "significado": "",
+        "linkImagen": "",
+        "tipoRespuesta": "SIMPLE_OPTION",
+        "opciones": [
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_MURO1",
+            "texto": "SI",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": [
+              {
+                "codigo": "Baldio",
+                "texto": "Deberá contar con una medianera de muro de 1,80 metros de atura."
+              }
+            ]
+          },
+          {
+            "codigo": "VIVIENDA_COMBINADOFAMILIAR_MURO2",
+            "texto": "NO",
+            "esRestrictiva": false,
+            "codigosPreguntasSiguientes": [],
+            "alertas": []
+          }
+        ],
+        "numeroOrden": 60,
+        "tieneAtributo": true,
+        "tipoAtributo": "INDIVIDUAL",
+        "codigoAtributoSis": "LIMITA_BALDIO"
+      }
+    ],
+    "codigo": "CF_FREESTYLE_EMISION",
+    "tipoFormulario": "EMISION"
+  },
+  "cantidadObjetos": 1
+}

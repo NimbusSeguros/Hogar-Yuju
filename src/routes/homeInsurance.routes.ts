@@ -9,7 +9,8 @@ import {
     submitClientData,
     submitEmissionForm,
     submitPaymentInfo,
-    confirmOrder
+    confirmOrder,
+    getPolizaPdf
 } from '../controllers/homeInsurance.controller';
 
 const router = Router();
@@ -27,5 +28,6 @@ router.post('/orders/:ordenVentaId/datocliente', submitClientData);
 router.post('/orders/:ordenVentaId/form/submit', submitEmissionForm);
 router.post('/orders/:ordenVentaId/infopago', submitPaymentInfo);
 router.post('/orders/:ordenVentaId/confirm', confirmOrder);
+router.get('/poliza/pdf', getPolizaPdf);
 
 export default router;

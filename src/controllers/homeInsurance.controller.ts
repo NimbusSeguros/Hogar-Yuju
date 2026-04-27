@@ -192,7 +192,7 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             'VIVIENDA_COMBINADOFAMILIAR_OCUPACION': 'VIVIENDA_COMBINADOFAMILIAR_OCUPACION1',
             'med_seg_pack': 'ALARMA', 
             'VIVIENDA_COMBINADOFAMILIAR_MURO': 'VIVIENDA_COMBINADOFAMILIAR_MURO2',
-            'tipoo': 'casss', // Discovered mandatory code for "Su vivienda es"
+            'tipooo': 'jous', // Discovered mandatory code for "Su vivienda es"
             'matconst': 'trad', // Discovered ID for Ladrillo
             'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK': 'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK1'
         };
@@ -301,7 +301,8 @@ export const confirmOrder = async (req: Request, res: Response) => {
         if (existing) {
             await SupabaseProvider.saveHogarOrder({
                 id: existing.id,
-                estado: 'emitido'
+                estado: 'emitido',
+                poliza: result.numero || result.numeroPropuesta || null
             });
         }
 
@@ -311,3 +312,29 @@ export const confirmOrder = async (req: Request, res: Response) => {
     }
 };
 
+export const getPolizaPdf = async (req: Request, res: Response) => {
+    try {
+        const { ramo, poliza, endoso } = req.query;
+        const { provider: providerName = 'RUS' } = req.query;
+        
+        if (!ramo || !poliza) {
+            return res.status(400).json({ error: 'Faltan parámetros ramo o poliza' });
+        }
+
+        const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
+        await provider.authenticate();
+
+        const pdfBuffer = await provider.getPolizaPdf(
+            parseInt(ramo as string),
+            parseInt(poliza as string),
+            parseInt((endoso as string) || '0')
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=Poliza_${poliza}.pdf`);
+        res.send(Buffer.from(pdfBuffer));
+    } catch (error: any) {
+        console.error('[Controller] Error downloading PDF:', error.message);
+        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
+    }
+};
