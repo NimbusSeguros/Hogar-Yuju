@@ -285,6 +285,7 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
                 error: error.message, 
                 details: error?.response?.data,
                 discoveredCodes: Array.from(validCodes),
+                discoveredForm: rusFormRes, // FULL DUMP FOR DEBUGGING
                 sentAnswers: filteredAnswers
             });
         }
