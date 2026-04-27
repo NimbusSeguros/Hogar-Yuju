@@ -226,8 +226,15 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             return isValid;
         });
 
-        console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
-        const result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
+        let result = { message: 'No underwriting questions required for this product' };
+        
+        // ONLY call RUS if there are actually questions to answer in this form
+        if (validCodes.size > 0) {
+            console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
+            result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
+        } else {
+            console.log('[Controller] Skipping submitEmissionForm because the form has no questions. Proceeding to next step.');
+        }
 
         // Guardar en Supabase - Guardamos telefono, nacimiento y limpiamos el json de domicilio
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
