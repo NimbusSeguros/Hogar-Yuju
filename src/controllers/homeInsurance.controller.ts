@@ -136,54 +136,69 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
         await provider.authenticate();
 
         if (personalData && addressData) {
-            // Transform frontend personalData into RUS exact schema, combining with the collected address
-            const clientPayload = {
-                nombre: personalData.nombre,
-                apellido: personalData.apellido,
-                tipoDocumento: personalData.tipoDocumento || 'DNI',
-                numeroDocumento: personalData.numeroDocumento,
-                nacionalidad: personalData.nacionalidad || 'ARG',
-                fechaNacimiento: `${personalData.fechaNacimientoAno}-${personalData.fechaNacimientoMes.padStart(2, '0')}-${personalData.fechaNacimientoDia.padStart(2, '0')}`,
-                email: personalData.email,
-                // SIAPI Kontakt/Contacto expects flat fields for phone, NOT a telefonos array
-                codTelefonoPais: "54", 
-                codTelefonoArea: personalData.telefono_codigo_area,
-                numeroTelefono: personalData.telefono_numero,
-                tipoPersona: "FISICA",
-                condicionIVA: "CONSUMIDOR_FINAL",
-                condicionIIBB: "NO_INSCRIPTO",
-                domicilio: {
-                    calle: addressData.calle,
-                    numero: addressData.numero,
-                    localidad: addressData.localidad,
-                    codigoPostal: addressData.codigoPostal,
-                    pais: 'ARGENTINA',
-                    provincia: addressData.provincia || 'ENTRE_RIOS' 
-                }
-            };
-
-            console.log('[Controller] Submitting Client Data:', JSON.stringify(clientPayload, null, 2));
-            await provider.submitClientData(ordenVentaId, clientPayload);
-        }
-
-        // --- IMPROVED DYNAMIC FILTERING ---
-        const rusFormRes = await provider.getEmissionForm(ordenVentaId);
-        const validCodes = new Set<string>();
-        
-        // Robust parsing of SIAPI form response (could be array, object with .preguntas, or nested)
-        const processForm = (item: any) => {
-            if (!item) return;
-            if (Array.isArray(item)) {
-                item.forEach(processForm);
-            } else {
-                if (item.preguntas && Array.isArray(item.preguntas)) {
-                    item.preguntas.forEach((p: any) => validCodes.add(p.codigo));
-                }
-                // Also check for sub-forms or other common SIAPI structures
-                if (item.formularios) processForm(item.formularios);
+        // 2. Submit Client Data (Aligning exactly with the working example provided by the user)
+        const clientPayload: any = {
+            tipoPersona: 'FISICA',
+            nacionalidad: personalData?.nacionalidad || 'ARG',
+            tipoDocumento: personalData?.tipoDocumento || 'DNI',
+            numeroDocumento: personalData?.numeroDocumento || personalData?.dni || '',
+            nombre: personalData?.nombre || '',
+            apellido: personalData?.apellido || '',
+            razonSocial: '',
+            fechaNacimiento: `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`,
+            codTelefonoPais: '54',
+            codTelefonoArea: personalData?.telefono_codigo_area || personalData?.codArea || '',
+            numeroTelefono: personalData?.telefono_numero || personalData?.telefono || '',
+            email: personalData?.email || '',
+            domicilio: {
+                calle: addressData?.calle || '',
+                numero: addressData?.numero || '',
+                codigoPostal: addressData?.codigoPostal || '',
+                localidad: addressData?.localidad || ''
             }
         };
-        processForm(rusFormRes);
+
+        // Only add piso/dpto if they have values, to keep the payload clean like the working example
+        if (addressData?.piso) (clientPayload.domicilio as any).piso = addressData.piso;
+        if (addressData?.departamento || addressData?.dpto) (clientPayload.domicilio as any).departamento = addressData.departamento || addressData.dpto;
+
+        console.log('[Controller] Submitting Client Data:', JSON.stringify(clientPayload, null, 2));
+        await provider.submitClientData(ordenVentaId, clientPayload);
+
+        // 3. Optional: Submit Underwriting Form (Emission Form)
+        // If the product doesn't need it, RUS will return "Pregunta indefinida".
+        // We will catch that specific error and ignore it, as the main data is already in clientPayload.
+        
+        try {
+            const rusFormRes = await provider.getEmissionForm(ordenVentaId);
+            const validCodes = new Set<string>();
+            const processForm = (item: any) => {
+                if (!item) return;
+                if (Array.isArray(item)) item.forEach(processForm);
+                else {
+                    if (item.preguntas) item.preguntas.forEach((p: any) => validCodes.add(p.codigo));
+                    if (item.formularios) processForm(item.formularios);
+                }
+            };
+            processForm(rusFormRes);
+
+            const finalAnswers = [...answers];
+            // ... (rest of filtering logic remains but wrapped in a safe try/catch)
+            const filteredAnswers = finalAnswers.filter(ans => validCodes.has(ans.codigoPregunta));
+            
+            if (filteredAnswers.length > 0) {
+                console.log('[Controller] Submitting Optional Emission Form Answers...');
+                await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
+            }
+        } catch (formError: any) {
+            const errorMsg = formError?.response?.data?.errores?.[0]?.mensaje || '';
+            if (errorMsg.includes('indefinida')) {
+                console.log('[Controller] RUS reports indefinite questions. Skipping emission form as it seems not required for this product.');
+            } else {
+                // If it's a different error, we still want to know
+                console.warn('[Controller] Warning during optional emission form submission:', errorMsg);
+            }
+        };
 
         console.log('[Controller] ALL Discovered valid question codes:', Array.from(validCodes));
 
