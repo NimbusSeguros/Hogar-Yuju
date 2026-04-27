@@ -166,6 +166,19 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             await provider.submitClientData(ordenVentaId, clientPayload);
         }
 
+        // Fetch the actual emission form to know which questions are valid for this specific order
+        const rusFormRes = await provider.getEmissionForm(ordenVentaId);
+        // The response might be an array of forms or a single object with a 'preguntas' array
+        const forms = Array.isArray(rusFormRes) ? rusFormRes : [rusFormRes];
+        const validCodes = new Set<string>();
+        forms.forEach((f: any) => {
+            if (f.preguntas) {
+                f.preguntas.forEach((p: any) => validCodes.add(p.codigo));
+            }
+        });
+
+        console.log('[Controller] Valid question codes for this form:', Array.from(validCodes));
+
         // Add mandatory underwiting answers for RUS CF Freestyle
         // 3. Submit the emission form answers (The actual underwriting questions)
         const finalAnswers = [...answers];
@@ -183,17 +196,17 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
-        // Add hidden mandatory answers with discovered internal IDs from emission_form_discovery.json
+        // Add hidden mandatory answers with discovered internal IDs
         const defaultQs: any = {
             'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD1',
             'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS': 'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2',
-            'M222': 100, // Number, not string
+            'M222': 100,
             'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS': 'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS2',
             'VIVIENDA_COMBINADOFAMILIAR_OCUPACION': 'VIVIENDA_COMBINADOFAMILIAR_OCUPACION1',
             'med_seg_pack': 'ALARMA', 
             'VIVIENDA_COMBINADOFAMILIAR_MURO': 'VIVIENDA_COMBINADOFAMILIAR_MURO2',
-            'tipooo': 'jous', // Discovered mandatory code for "Su vivienda es"
-            'matconst': 'trad', // Discovered ID for Ladrillo
+            'tipooo': 'jous',
+            'matconst': 'trad',
             'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK': 'VIVIENDA_COMBINADOFAMILIAR_PREGUNTATIPOVIVIENDA_PACK1'
         };
 
@@ -203,8 +216,18 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
-        console.log('[Controller] Submitting Emission Form Answers:', JSON.stringify({ respuestas: finalAnswers }, null, 2));
-        const result = await provider.submitEmissionForm(ordenVentaId, finalAnswers);
+        // --- DYNAMIC FILTERING ---
+        // Only keep answers whose code exists in the current RUS form
+        const filteredAnswers = finalAnswers.filter(ans => {
+            const isValid = validCodes.has(ans.codigoPregunta);
+            if (!isValid) {
+                console.warn(`[Controller] Removing invalid question code for this form: ${ans.codigoPregunta}`);
+            }
+            return isValid;
+        });
+
+        console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
+        const result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
 
         // Guardar en Supabase - Guardamos telefono, nacimiento y limpiamos el json de domicilio
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);

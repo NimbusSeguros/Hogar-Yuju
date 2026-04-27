@@ -137,6 +137,12 @@ export class RusProvider implements InsuranceProvider {
         return response.data;
     }
 
+    /** Get the emission form (underwriting questions) for an active order */
+    async getEmissionForm(ordenVentaId: string): Promise<any> {
+        const response = await this.apiClient.get(`/ordenventas/${ordenVentaId}/formularios`);
+        return response.data;
+    }
+
     /** STEP 3: Cargar datos específicos del riesgo (ej. Domicilio) */
     async submitEmissionForm(ordenVentaId: string, answers: any[]): Promise<any> {
         // En emisión, se espera RespuestasEmisionRequest
