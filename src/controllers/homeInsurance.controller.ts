@@ -235,44 +235,61 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
             result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
         } else if (validCodes.size > 0) {
-            // This is a bad state: form has questions but we matched NONE.
+        
+        if (validCodes.size > 0 && filteredAnswers.length === 0) {
             console.error('[Controller] CRITICAL: Form has questions but none matched our defaults!', Array.from(validCodes));
-            throw new Error(`Faltan responder preguntas obligatorias: ${Array.from(validCodes).join(', ')}`);
-        } else {
-            console.log('[Controller] No questions found in form, skipping submission.');
+            res.status(400).json({ 
+                error: 'Faltan responder preguntas obligatorias', 
+                discoveredCodes: Array.from(validCodes)
+            });
+            return;
         }
 
-        // Guardar en Supabase - Guardamos telefono, nacimiento y limpiamos el json de domicilio
-        const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
-        if (existing) {
-            // Extraer solo lo más importante del domicilio
-            const cleanDomicilio = {
-                calle: addressData?.calle || '',
-                numero: addressData?.numero || '',
-                piso: addressData?.piso || '',
-                dpto: addressData?.dpto || '',
-                localidad: addressData?.localidad || '',
-                codigoPostal: addressData?.codigoPostal || ''
-            };
+        console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
+        
+        try {
+            let result = { message: 'No underwriting questions required or found' };
+            if (filteredAnswers.length > 0) {
+                result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
+            }
+            
+            const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
+            if (existing) {
+                const cleanDomicilio = {
+                    calle: addressData?.calle || '',
+                    numero: addressData?.numero || '',
+                    piso: addressData?.piso || '',
+                    dpto: addressData?.dpto || '',
+                    localidad: addressData?.localidad || '',
+                    codigoPostal: addressData?.codigoPostal || ''
+                };
 
-            const updatePayload: any = {
-                id: existing.id,
-                domicilio: cleanDomicilio,
-                estado: 'domicilio_completado'
-            };
+                const updatePayload: any = {
+                    id: existing.id,
+                    domicilio: cleanDomicilio,
+                    estado: 'domicilio_completado'
+                };
 
-            // Asegurar que guardamos telefono y fecha de nacimiento si vienen en personalData
-            if (personalData) {
-                updatePayload.telefono = `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`;
-                updatePayload.fecha_nacimiento = `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`;
+                if (personalData) {
+                    updatePayload.telefono = `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`;
+                    updatePayload.fecha_nacimiento = `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`;
+                }
+
+                await SupabaseProvider.saveHogarOrder(updatePayload);
             }
 
-            await SupabaseProvider.saveHogarOrder(updatePayload);
+            res.json(result);
+        } catch (error: any) {
+            console.error('[Controller] ERROR in submitEmissionForm call:', error?.response?.data || error.message);
+            res.status(error?.response?.status || 500).json({ 
+                error: error.message, 
+                details: error?.response?.data,
+                discoveredCodes: Array.from(validCodes),
+                sentAnswers: filteredAnswers
+            });
         }
-
-        res.json(result);
     } catch (error: any) {
-        console.error('[Controller] ERROR in submitEmissionForm:', JSON.stringify(error?.response?.data || error.message, null, 2));
+        console.error('[Controller] CRITICAL ERROR in submitEmissionForm:', error.message);
         res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
     }
 };
