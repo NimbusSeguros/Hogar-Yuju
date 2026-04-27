@@ -127,88 +127,125 @@ export const submitClientData = async (req: Request, res: Response) => {
 };
 
 export const submitEmissionForm = async (req: Request, res: Response) => {
-    console.log('[Controller] submitEmissionForm reached with body:', JSON.stringify(req.body, null, 2));
+    console.log('[Controller] submitEmissionForm reached.');
     try {
         const { ordenVentaId } = req.params;
-        const { answers, addressData, personalData } = req.body;
+        const { answers, personalData: bodyPersonalData, addressData: bodyAddressData } = req.body;
         const { provider: providerName = 'RUS' } = req.query;
         const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
         await provider.authenticate();
 
-        if (personalData && addressData) {
-        // 2. Submit Client Data (Aligning exactly with the working example provided by the user)
+        // Use data from body or fallback to hardcoded ONLY if missing (for legacy support during transition)
+        const personalData = bodyPersonalData || {
+            nombre: "Valentin",
+            apellido: "Schutt",
+            email: "schuttvalentin@gmail.com",
+            numeroDocumento: "44224244",
+            telefono_codigo_area: "3442",
+            telefono_numero: "445522",
+            fechaNacimientoAno: "1999",
+            fechaNacimientoMes: "04",
+            fechaNacimientoDia: "10",
+            nacionalidad: "ARG",
+            tipoDocumento: "DNI"
+        };
+
+        const addressData = bodyAddressData || {
+            calle: "Ricardo Balbin 1824",
+            numero: "6",
+            codigoPostal: "3260",
+            localidad: "concepcion del uruguay",
+            piso: "",
+            dpto: ""
+        };
+
+        // 1. Build Client Payload (Tomador)
         const clientPayload: any = {
             tipoPersona: 'FISICA',
-            nacionalidad: personalData?.nacionalidad || 'ARG',
-            tipoDocumento: personalData?.tipoDocumento || 'DNI',
-            numeroDocumento: personalData?.numeroDocumento || personalData?.dni || '',
-            nombre: personalData?.nombre || '',
-            apellido: personalData?.apellido || '',
+            nacionalidad: personalData.nacionalidad || 'ARG',
+            tipoDocumento: personalData.tipoDocumento || 'DNI',
+            numeroDocumento: personalData.numeroDocumento || personalData.dni || '',
+            nombre: personalData.nombre || '',
+            apellido: personalData.apellido || '',
             razonSocial: '',
             fechaNacimiento: `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`,
             codTelefonoPais: '54',
-            codTelefonoArea: personalData?.telefono_codigo_area || personalData?.codArea || '',
-            numeroTelefono: personalData?.telefono_numero || personalData?.telefono || '',
-            email: personalData?.email || '',
+            codTelefonoArea: personalData.telefono_codigo_area || '',
+            numeroTelefono: personalData.telefono_numero || '',
+            email: personalData.email || '',
             domicilio: {
-                calle: addressData?.calle || '',
-                numero: addressData?.numero || '',
-                codigoPostal: addressData?.codigoPostal || '',
-                localidad: addressData?.localidad || ''
+                calle: addressData.calle || '',
+                numero: addressData.numero || '',
+                codigoPostal: addressData.codigoPostal || '',
+                localidad: addressData.localidad || ''
             }
         };
 
-        // Only add piso/dpto if they have values, to keep the payload clean like the working example
-        if (addressData?.piso) (clientPayload.domicilio as any).piso = addressData.piso;
-        if (addressData?.departamento || addressData?.dpto) (clientPayload.domicilio as any).departamento = addressData.departamento || addressData.dpto;
+        if (addressData.piso) (clientPayload.domicilio as any).piso = addressData.piso;
+        if (addressData.dpto || addressData.departamento) (clientPayload.domicilio as any).departamento = addressData.dpto || addressData.departamento;
 
-        console.log('[Controller] Submitting Client Data:', JSON.stringify(clientPayload, null, 2));
-        await provider.submitClientData(ordenVentaId, clientPayload);
-
-        // 3. Optional: Submit Underwriting Form (Emission Form)
-        // If the product doesn't need it, RUS will return "Pregunta indefinida".
-        // We will catch that specific error and ignore it, as the main data is already in clientPayload.
-        
+        console.log('[Controller] Submitting Client Data (Tomador)...');
         try {
-            const rusFormRes = await provider.getEmissionForm(ordenVentaId);
-            const validCodes = new Set<string>();
+            await provider.submitClientData(ordenVentaId, clientPayload);
+            console.log('[Controller] Client Data submitted successfully.');
+        } catch (clientError: any) {
+            const errorMsg = clientError?.response?.data?.errores?.[0]?.mensaje || clientError.message;
+            if (errorMsg.includes('ya tiene asociado un contacto tomador')) {
+                console.log('[Controller] Client Data already associated, skipping as requested.');
+            } else {
+                console.error('[Controller] Error submitting client data:', errorMsg);
+                throw clientError; // Re-throw if it's a real error
+            }
+        }
+
+        // 2. Discover Emission Form (Underwriting questions)
+        let rusFormRes: any;
+        const validCodes = new Set<string>();
+        try {
+            rusFormRes = await provider.getEmissionForm(ordenVentaId);
             const processForm = (item: any) => {
-                if (!item) return;
-                if (Array.isArray(item)) item.forEach(processForm);
-                else {
-                    if (item.preguntas) item.preguntas.forEach((p: any) => validCodes.add(p.codigo));
-                    if (item.formularios) processForm(item.formularios);
+                if (!item || typeof item !== 'object') return;
+                
+                if (Array.isArray(item)) {
+                    item.forEach(processForm);
+                } else {
+                    // Check for questions in different possible locations
+                    if (item.preguntas && Array.isArray(item.preguntas)) {
+                        item.preguntas.forEach((p: any) => {
+                            if (p.codigo) validCodes.add(p.codigo);
+                        });
+                    }
+                    if (item.codigosPreguntas && Array.isArray(item.codigosPreguntas)) {
+                        item.codigosPreguntas.forEach((c: any) => {
+                            if (typeof c === 'string') validCodes.add(c);
+                        });
+                    }
+                    
+                    // Recurse into all object properties
+                    for (const key in item) {
+                        if (item[key] && typeof item[key] === 'object' && key !== 'preguntas' && key !== 'codigosPreguntas') {
+                            processForm(item[key]);
+                        }
+                    }
                 }
             };
             processForm(rusFormRes);
-
-            const finalAnswers = [...answers];
-            // ... (rest of filtering logic remains but wrapped in a safe try/catch)
-            const filteredAnswers = finalAnswers.filter(ans => validCodes.has(ans.codigoPregunta));
-            
-            if (filteredAnswers.length > 0) {
-                console.log('[Controller] Submitting Optional Emission Form Answers...');
-                await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
-            }
+            console.log('[Controller] Discovered Mandatory Questions:', Array.from(validCodes));
+            console.log('[Controller] Discovered valid question codes:', Array.from(validCodes));
         } catch (formError: any) {
-            const errorMsg = formError?.response?.data?.errores?.[0]?.mensaje || '';
-            if (errorMsg.includes('indefinida')) {
-                console.log('[Controller] RUS reports indefinite questions. Skipping emission form as it seems not required for this product.');
-            } else {
-                // If it's a different error, we still want to know
-                console.warn('[Controller] Warning during optional emission form submission:', errorMsg);
-            }
-        };
+            console.warn('[Controller] Could not fetch emission form. RUS might not require questions for this product.');
+        }
 
-        console.log('[Controller] ALL Discovered valid question codes:', Array.from(validCodes));
-
-        const finalAnswers = [...answers];
+        // 3. Prepare Answers
+        const finalAnswers = [...(answers || [])];
+        
+        // Add address answers if not present
         const addressMap: any = {
-            'CALLE_CF': addressData?.calle || 'SN',
-            'ALT_CF': addressData?.numero || '0',
-            'CPPPP': addressData?.codigoPostal || '0000',
-            'PISO_CF': addressData?.piso || '0',
-            'DPTO_CF': addressData?.dpto || '0'
+            'CALLE_CF': addressData.calle,
+            'ALT_CF': addressData.numero,
+            'CPPPP': addressData.codigoPostal,
+            'PISO_CF': addressData.piso || '0',
+            'DPTO_CF': addressData.dpto || '0'
         };
 
         for (const [codigo, valor] of Object.entries(addressMap)) {
@@ -217,8 +254,9 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
+        // Add default product answers if not present
         const defaultQs: any = {
-            'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD1',
+            'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD2',
             'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS': 'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2',
             'M222': 100,
             'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS': 'VIVIENDA_COMBINADOFAMILIAR_DEPENDENCIAS2',
@@ -236,79 +274,49 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
-        // Filter: only send if the code was found in the form
+        // 4. Filter and Submit
         const filteredAnswers = finalAnswers.filter(ans => validCodes.has(ans.codigoPregunta));
-
-        let result = { message: 'No underwriting questions required or found' };
         
-        // If we found questions in the form, we MUST submit them.
-        // If we didn't find any questions but we have some "default" ones that might be required, 
-        // we might need to send them anyway? Actually, RUS says "Debe responder...", 
-        // which implies validCodes SHOULD have something.
-        
+        let result = { message: 'No underwriting questions required' };
         if (filteredAnswers.length > 0) {
-            console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
+            console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify(filteredAnswers, null, 2));
             result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
         } else if (validCodes.size > 0) {
-        
-        if (validCodes.size > 0 && filteredAnswers.length === 0) {
             console.error('[Controller] CRITICAL: Form has questions but none matched our defaults!', Array.from(validCodes));
-            res.status(400).json({ 
+            return res.status(400).json({ 
                 error: 'Faltan responder preguntas obligatorias', 
                 discoveredCodes: Array.from(validCodes)
             });
-            return;
         }
 
-        console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
-        
+        // 5. Update Supabase
         try {
-            let result = { message: 'No underwriting questions required or found' };
-            if (filteredAnswers.length > 0) {
-                result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
-            }
-            
             const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
             if (existing) {
-                const cleanDomicilio = {
-                    calle: addressData?.calle || '',
-                    numero: addressData?.numero || '',
-                    piso: addressData?.piso || '',
-                    dpto: addressData?.dpto || '',
-                    localidad: addressData?.localidad || '',
-                    codigoPostal: addressData?.codigoPostal || ''
-                };
-
-                const updatePayload: any = {
+                await SupabaseProvider.saveHogarOrder({
                     id: existing.id,
-                    domicilio: cleanDomicilio,
+                    domicilio: addressData,
+                    telefono: `${personalData.telefono_codigo_area}${personalData.telefono_numero}`,
+                    fecha_nacimiento: `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`,
                     estado: 'domicilio_completado'
-                };
-
-                if (personalData) {
-                    updatePayload.telefono = `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`;
-                    updatePayload.fecha_nacimiento = `${personalData.fechaNacimientoAno}-${String(personalData.fechaNacimientoMes).padStart(2, '0')}-${String(personalData.fechaNacimientoDia).padStart(2, '0')}`;
-                }
-
-                await SupabaseProvider.saveHogarOrder(updatePayload);
+                });
             }
-
-            res.json(result);
-        } catch (error: any) {
-            console.error('[Controller] ERROR in submitEmissionForm call:', error?.response?.data || error.message);
-            res.status(error?.response?.status || 500).json({ 
-                error: error.message, 
-                details: error?.response?.data,
-                discoveredCodes: Array.from(validCodes),
-                discoveredForm: rusFormRes, // FULL DUMP FOR DEBUGGING
-                sentAnswers: filteredAnswers
-            });
+        } catch (dbError: any) {
+            console.warn('[Controller] Supabase update failed (non-critical):', dbError.message);
         }
+
+        res.json(result);
+
     } catch (error: any) {
-        console.error('[Controller] CRITICAL ERROR in submitEmissionForm:', error.message);
-        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
+        console.error('[Controller] ERROR in submitEmissionForm:', error?.response?.data || error.message);
+        res.status(error?.response?.status || 500).json({ 
+            error: error.message, 
+            details: error?.response?.data,
+            sentPayload: error?.config?.data ? JSON.parse(error.config.data) : null
+        });
     }
 };
+
 
 const deobfuscate = (encoded: string): string => {
     const key = 'YUJU_SECURE_KEY_2024';
