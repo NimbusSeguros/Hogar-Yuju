@@ -166,28 +166,34 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             await provider.submitClientData(ordenVentaId, clientPayload);
         }
 
-        // Fetch the actual emission form to know which questions are valid for this specific order
+        // --- IMPROVED DYNAMIC FILTERING ---
         const rusFormRes = await provider.getEmissionForm(ordenVentaId);
-        // The response might be an array of forms or a single object with a 'preguntas' array
-        const forms = Array.isArray(rusFormRes) ? rusFormRes : [rusFormRes];
         const validCodes = new Set<string>();
-        forms.forEach((f: any) => {
-            if (f.preguntas) {
-                f.preguntas.forEach((p: any) => validCodes.add(p.codigo));
+        
+        // Robust parsing of SIAPI form response (could be array, object with .preguntas, or nested)
+        const processForm = (item: any) => {
+            if (!item) return;
+            if (Array.isArray(item)) {
+                item.forEach(processForm);
+            } else {
+                if (item.preguntas && Array.isArray(item.preguntas)) {
+                    item.preguntas.forEach((p: any) => validCodes.add(p.codigo));
+                }
+                // Also check for sub-forms or other common SIAPI structures
+                if (item.formularios) processForm(item.formularios);
             }
-        });
+        };
+        processForm(rusFormRes);
 
-        console.log('[Controller] Valid question codes for this form:', Array.from(validCodes));
+        console.log('[Controller] ALL Discovered valid question codes:', Array.from(validCodes));
 
-        // Add mandatory underwiting answers for RUS CF Freestyle
-        // 3. Submit the emission form answers (The actual underwriting questions)
         const finalAnswers = [...answers];
-
-        // Ensure address questions use the specific CF codes
         const addressMap: any = {
             'CALLE_CF': addressData?.calle || 'SN',
             'ALT_CF': addressData?.numero || '0',
             'CPPPP': addressData?.codigoPostal || '0000',
+            'PISO_CF': addressData?.piso || '0',
+            'DPTO_CF': addressData?.dpto || '0'
         };
 
         for (const [codigo, valor] of Object.entries(addressMap)) {
@@ -196,7 +202,6 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
-        // Add hidden mandatory answers with discovered internal IDs
         const defaultQs: any = {
             'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD': 'VIVIENDA_COMBINADOFAMILIAR_ACTIVIDAD1',
             'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS': 'VIVIENDA_COMBINADOFAMILIAR_SINIESTROS2',
@@ -216,24 +221,25 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             }
         }
 
-        // --- DYNAMIC FILTERING ---
-        // Only keep answers whose code exists in the current RUS form
-        const filteredAnswers = finalAnswers.filter(ans => {
-            const isValid = validCodes.has(ans.codigoPregunta);
-            if (!isValid) {
-                console.warn(`[Controller] Removing invalid question code for this form: ${ans.codigoPregunta}`);
-            }
-            return isValid;
-        });
+        // Filter: only send if the code was found in the form
+        const filteredAnswers = finalAnswers.filter(ans => validCodes.has(ans.codigoPregunta));
 
-        let result = { message: 'No underwriting questions required for this product' };
+        let result = { message: 'No underwriting questions required or found' };
         
-        // ONLY call RUS if there are actually questions to answer in this form
-        if (validCodes.size > 0) {
+        // If we found questions in the form, we MUST submit them.
+        // If we didn't find any questions but we have some "default" ones that might be required, 
+        // we might need to send them anyway? Actually, RUS says "Debe responder...", 
+        // which implies validCodes SHOULD have something.
+        
+        if (filteredAnswers.length > 0) {
             console.log('[Controller] Submitting Filtered Emission Form Answers:', JSON.stringify({ respuestas: filteredAnswers }, null, 2));
             result = await provider.submitEmissionForm(ordenVentaId, filteredAnswers);
+        } else if (validCodes.size > 0) {
+            // This is a bad state: form has questions but we matched NONE.
+            console.error('[Controller] CRITICAL: Form has questions but none matched our defaults!', Array.from(validCodes));
+            throw new Error(`Faltan responder preguntas obligatorias: ${Array.from(validCodes).join(', ')}`);
         } else {
-            console.log('[Controller] Skipping submitEmissionForm because the form has no questions. Proceeding to next step.');
+            console.log('[Controller] No questions found in form, skipping submission.');
         }
 
         // Guardar en Supabase - Guardamos telefono, nacimiento y limpiamos el json de domicilio
