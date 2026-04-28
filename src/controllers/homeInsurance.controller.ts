@@ -70,30 +70,35 @@ export const getPlansByConsultaId = async (req: Request, res: Response) => {
 // ===== EMISSION FLOW =====
 
 export const createOrder = async (req: Request, res: Response) => {
-    console.log('[Controller] Bypassing RUS createOrder. Creating lead in Supabase.');
+    console.log('[Controller] Bypassing RUS createOrder. Creating complete lead in Supabase.');
     try {
-        const { idConsulta, plan, formaPago, personalData } = req.body;
+        const { plan, formaPago, personalData, addressData, paymentData } = req.body;
 
-        // Generar un ID local basado en el tiempo para seguimiento interno
         const localOrderId = `YJ-HOG-${Date.now()}`;
 
-        // Guardar en Supabase (datos personales iniciales)
+        // Guardar en Supabase (todos los datos recolectados)
         const dbOrder = await SupabaseProvider.saveHogarOrder({
             nombre: personalData.nombre,
             apellido: personalData.apellido,
             email: personalData.email,
             dni: personalData.numeroDocumento,
-            plan_codigo: plan.codigo,
-            precio_cuota: formaPago.precioCuota,
-            order_id_rus: localOrderId, // Usamos el ID local como referencia
-            estado: 'esperando_datos_ubicacion'
+            telefono: `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`,
+            fecha_nacimiento: `${personalData.fechaNacimientoAno || ''}-${String(personalData.fechaNacimientoMes || '').padStart(2, '0')}-${String(personalData.fechaNacimientoDia || '').padStart(2, '0')}`,
+            domicilio: addressData,
+            metodo_pago: paymentData?.method || null,
+            marca_tarjeta: paymentData?.marcaTarjeta || null,
+            plan_codigo: plan?.codigo,
+            precio_cuota: formaPago?.precioCuota,
+            order_id_rus: localOrderId,
+            estado: 'esperando_asesor'
         });
 
         res.json({ 
-            rusOrder: { ordenVentaID: localOrderId }, // Devolvemos el ID local al frontend
+            rusOrder: { ordenVentaID: localOrderId },
             dbOrder 
         });
     } catch (error: any) {
+        console.error('[Controller] Error in unified createOrder:', error.message);
         res.status(500).json({ error: error.message });
     }
 };
