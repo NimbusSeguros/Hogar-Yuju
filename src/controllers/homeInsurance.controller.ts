@@ -99,29 +99,25 @@ export const createOrder = async (req: Request, res: Response) => {
 };
 
 export const submitClientData = async (req: Request, res: Response) => {
+    console.log('[Controller] Bypassing RUS submitClientData. Updating lead in Supabase.');
     try {
         const { ordenVentaId } = req.params;
         const { clientData } = req.body;
-        const { provider: providerName = 'RUS' } = req.query;
-        const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
-        await provider.authenticate();
 
-        const result = await provider.submitClientData(ordenVentaId, clientData);
-
-        // Actualizar Supabase con más detalles si es necesario
+        // Actualizar Supabase con más detalles
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
         if (existing) {
             await SupabaseProvider.saveHogarOrder({
                 id: existing.id,
-                telefono: `${clientData.codTelefonoArea}${clientData.numeroTelefono}`,
+                telefono: `${clientData.codTelefonoArea || ''}${clientData.numeroTelefono || ''}`,
                 fecha_nacimiento: clientData.fechaNacimiento,
                 estado: 'datos_personales_completos'
             });
         }
 
-        res.json(result);
+        res.json({ message: 'Datos personales guardados localmente', status: 'OK' });
     } catch (error: any) {
-        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
+        res.status(500).json({ error: error.message });
     }
 };
 
