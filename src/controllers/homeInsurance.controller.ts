@@ -338,61 +338,44 @@ const deobfuscate = (encoded: string): string => {
 export const submitPaymentInfo = async (req: Request, res: Response) => {
     try {
         const { ordenVentaId } = req.params;
-        let { paymentInfo, _enc } = req.body;
-        const { provider: providerName = 'RUS' } = req.query;
+        const { paymentInfo } = req.body;
 
-        // Deobfuscate if requested by frontend
-        if (_enc) {
-            if (paymentInfo.numeroTarjeta) {
-                paymentInfo.numeroTarjeta = deobfuscate(paymentInfo.numeroTarjeta);
-            }
-            if (paymentInfo.CBU) {
-                paymentInfo.CBU = deobfuscate(paymentInfo.CBU);
-            }
-        }
-
-        const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
-        await provider.authenticate();
-
-        const result = await provider.submitPaymentInfo(ordenVentaId, paymentInfo);
+        console.log('[Controller] Bypassing RUS payment submission. Saving choice to Supabase.');
 
         // Actualizar estado en Supabase
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
         if (existing) {
             await SupabaseProvider.saveHogarOrder({
                 id: existing.id,
-                estado: 'pago_ingresado'
+                estado: 'esperando_asesor',
+                metodo_pago: paymentInfo?.medioPago || paymentInfo?.method,
+                marca_tarjeta: paymentInfo?.marcaTarjeta || null
             });
         }
 
-        res.json(result);
+        res.json({ message: 'Selección de pago guardada. Un asesor lo contactará.', status: 'OK' });
     } catch (error: any) {
-        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
+        res.status(500).json({ error: error.message });
     }
 };
 
 export const confirmOrder = async (req: Request, res: Response) => {
     try {
         const { ordenVentaId } = req.params;
-        const { provider: providerName = 'RUS' } = req.query;
-        const provider: any = InsuranceProviderFactory.getProvider(providerName as string);
-        await provider.authenticate();
-
-        const result = await provider.confirmOrder(ordenVentaId);
+        console.log('[Controller] Bypassing RUS confirmOrder. Marking as pending advisor.');
 
         // Actualizar estado final en Supabase
         const existing = await SupabaseProvider.getOrderByRusId(ordenVentaId as string);
         if (existing) {
             await SupabaseProvider.saveHogarOrder({
                 id: existing.id,
-                estado: 'emitido',
-                poliza: result.numero || result.numeroPropuesta || null
+                estado: 'esperando_asesor_final'
             });
         }
 
-        res.json(result);
+        res.json({ message: 'Solicitud enviada correctamente', status: 'OK' });
     } catch (error: any) {
-        res.status(error?.response?.status || 500).json({ error: error.message, details: error?.response?.data });
+        res.status(500).json({ error: error.message });
     }
 };
 
