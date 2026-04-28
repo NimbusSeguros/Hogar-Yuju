@@ -82,7 +82,7 @@ export const createOrder = async (req: Request, res: Response) => {
             apellido: personalData.apellido,
             email: personalData.email,
             dni: personalData.numeroDocumento,
-            telefono: `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`,
+            telefono: `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || personalData.telefono || ''}`,
             fecha_nacimiento: `${personalData.fechaNacimientoAno || ''}-${String(personalData.fechaNacimientoMes || '').padStart(2, '0')}-${String(personalData.fechaNacimientoDia || '').padStart(2, '0')}`,
             domicilio: addressData,
             metodo_pago: paymentData?.method || null,
@@ -141,7 +141,7 @@ export const submitEmissionForm = async (req: Request, res: Response) => {
             await SupabaseProvider.saveHogarOrder({
                 id: existing.id,
                 domicilio: addressData,
-                telefono: `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || ''}`,
+                telefono: `${personalData.telefono_codigo_area || ''}${personalData.telefono_numero || personalData.telefono || ''}`,
                 fecha_nacimiento: `${personalData.fechaNacimientoAno || ''}-${String(personalData.fechaNacimientoMes || '').padStart(2, '0')}-${String(personalData.fechaNacimientoDia || '').padStart(2, '0')}`,
                 estado: 'domicilio_completado'
             });
